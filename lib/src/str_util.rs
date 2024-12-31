@@ -48,6 +48,8 @@ pub enum StringPattern {
     Exact(String),
     /// Matches strings case‐insensitively.
     ExactI(String),
+    /// Matches everything except the given string.
+    Not(String),
     /// Matches strings that contain a substring.
     Substring(String),
     /// Matches strings that case‐insensitively contain a substring.
@@ -91,6 +93,11 @@ impl StringPattern {
         StringPattern::ExactI(src.into())
     }
 
+    /// Constructs a pattern that matches everything except the given string.
+    pub fn not(src: impl Into<String>) -> Self {
+        StringPattern::Not(src.into())
+    }
+
     /// Constructs a pattern that matches a substring.
     pub fn substring(src: impl Into<String>) -> Self {
         StringPattern::Substring(src.into())
@@ -125,6 +132,7 @@ impl StringPattern {
         match kind {
             "exact" => Ok(StringPattern::exact(src)),
             "exact-i" => Ok(StringPattern::exact_i(src)),
+            "not" => Ok(StringPattern::not(src)),
             "substring" => Ok(StringPattern::substring(src)),
             "substring-i" => Ok(StringPattern::substring_i(src)),
             "glob" => StringPattern::glob(src),
@@ -157,6 +165,7 @@ impl StringPattern {
         match self {
             StringPattern::Exact(literal) => literal,
             StringPattern::ExactI(literal) => literal,
+            StringPattern::Not(literal) => literal,
             StringPattern::Substring(needle) => needle,
             StringPattern::SubstringI(needle) => needle,
             StringPattern::Glob(pattern) => pattern.as_str(),
@@ -182,6 +191,7 @@ impl StringPattern {
             }
             StringPattern::Glob(pattern) => Some(pattern.as_str().into()),
             StringPattern::ExactI(_) => None,
+            StringPattern::Not(_) => None,
             StringPattern::SubstringI(_) => None,
             StringPattern::GlobI(_) => None,
             StringPattern::Regex(_) => None,
@@ -211,6 +221,7 @@ impl StringPattern {
         match self {
             StringPattern::Exact(literal) => haystack == literal,
             StringPattern::ExactI(literal) => haystack.eq_ignore_ascii_case(literal),
+            StringPattern::Not(literal) => haystack != literal,
             StringPattern::Substring(needle) => haystack.contains(needle),
             StringPattern::SubstringI(needle) => haystack
                 .to_ascii_lowercase()
