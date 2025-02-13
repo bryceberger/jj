@@ -5,10 +5,10 @@ use jj_lib::dsl_util::ExpressionNode;
 use jj_lib::repo::ReadonlyRepo;
 use jj_lib::revset::parse_program;
 use jj_lib::revset::ExpressionKind;
+use jj_lib::revset::LoweringContext;
 use jj_lib::revset::ResolvedRevsetExpression;
 use jj_lib::revset::RevsetDiagnostics;
 use jj_lib::revset::RevsetExpression;
-use jj_lib::revset::RevsetParseContext;
 use jj_lib::revset::SymbolResolver;
 
 use crate::cli_util::CommandHelper;
@@ -33,7 +33,7 @@ pub fn cmd_debug_revset_contained_in(
     args: &DebugRevsetContainedInArgs,
 ) -> Result<(), CommandError> {
     let workspace_command = command.workspace_helper(ui)?;
-    let workspace_ctx = workspace_command.revset_parse_context();
+    let workspace_ctx = workspace_command.env().revset_parse_context();
     let repo = workspace_command.repo().as_ref();
     let mut symbol_resolver = revset_util::default_symbol_resolver(
         repo,
@@ -46,11 +46,12 @@ pub fn cmd_debug_revset_contained_in(
 
     let node = parse_program(args.expression.as_ref())?;
     let node: ExpressionNode<'_, ExpressionKind<'_>> =
-        dsl_util::expand_aliases(node, workspace_ctx.aliases_map())?;
+        dsl_util::expand_aliases(node, workspace_ctx.aliases_map)?;
+
     show_contained_in(
         &mut ContainedInArgs {
             ui,
-            context: &workspace_ctx,
+            context: &workspace_ctx.to_lowering_context(),
             symbol_resolver: &mut symbol_resolver,
             repo,
             align: args.expression.as_ref().len(),
@@ -65,7 +66,7 @@ pub fn cmd_debug_revset_contained_in(
 
 struct ContainedInArgs<'a> {
     ui: &'a Ui,
-    context: &'a RevsetParseContext<'a>,
+    context: &'a LoweringContext<'a>,
     symbol_resolver: &'a mut dyn SymbolResolver,
     repo: &'a ReadonlyRepo,
     align: usize,
@@ -138,15 +139,22 @@ fn show_contained_in(
             Ok(())
         }
         ExpressionKind::AliasExpanded(_id, expanded) => {
-            indent.push_str("└─");
-            show_contained_in(args, expanded, indent)?;
-            indent.pop();
-            indent.pop();
+            if might_be_revset(&expanded.kind) {
+                indent.push_str("└─");
+                show_contained_in(args, expanded, indent)?;
+                indent.pop();
+                indent.pop();
+            }
             Ok(())
         }
         ExpressionKind::FunctionCall(call) => {
-            for (idx, a) in call.args.iter().enumerate() {
-                let last = idx == call.args.len() - 1;
+            let call_args: Vec<_> = call
+                .args
+                .iter()
+                .filter(|a| might_be_revset(&a.kind))
+                .collect();
+            for (idx, a) in call_args.iter().enumerate() {
+                let last = idx == call_args.len() - 1;
                 if last {
                     indent.push_str("└─");
                 } else {
@@ -170,4 +178,11 @@ fn show_contained_in(
         | ExpressionKind::RangeAll
         | ExpressionKind::Modifier(_) => Ok(()),
     }
+}
+
+fn might_be_revset(kind: &ExpressionKind<'_>) -> bool {
+    !matches!(
+        kind,
+        ExpressionKind::String(_) | ExpressionKind::StringPattern { .. }
+    )
 }
