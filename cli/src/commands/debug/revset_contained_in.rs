@@ -57,7 +57,7 @@ pub fn cmd_debug_revset_contained_in(
             target: &target,
         },
         &node,
-        0,
+        &mut "".into(),
     )?;
 
     Ok(())
@@ -75,7 +75,7 @@ struct ContainedInArgs<'a> {
 fn show_contained_in(
     args: &mut ContainedInArgs<'_>,
     expression: &ExpressionNode<'_, ExpressionKind<'_>>,
-    indent: usize,
+    indent: &mut String,
 ) -> Result<(), CommandError> {
     args.align = args.align.max(expression.span.as_str().len());
 
@@ -89,30 +89,72 @@ fn show_contained_in(
         .intersection(args.target)
         .evaluate(args.repo)?
         .is_empty();
+    let bold = "\x1b[1m";
+    let dim = "\x1b[2m";
+    let reset = "\x1b[0m";
     println!(
-        "{color}{contained_in:5} {:indent$}{expression}\x1b[0m",
-        "",
+        "{color}{contained_in:5}{dim} {indent}{reset}{color}{expression}{reset}",
         expression = expression.span.as_str(),
-        color = if contained_in { "\x1b[1m" } else { "\x1b[2m" }
+        color = if contained_in { bold } else { dim }
     );
 
-    let mut recurse = |exp| show_contained_in(args, exp, indent + 2);
+    if !indent.is_empty() && indent.ends_with("├─") {
+        indent.replace_range(indent.len() - "├─".len().., "│ ");
+    } else if indent.ends_with("└─") {
+        indent.replace_range(indent.len() - "└─".len().., "  ");
+    }
+
     match &expression.kind {
-        ExpressionKind::Unary(_op, node) => recurse(node),
+        ExpressionKind::Unary(_op, node) => {
+            indent.push_str("└─");
+            show_contained_in(args, node, indent)?;
+            indent.pop();
+            indent.pop();
+            Ok(())
+        }
         ExpressionKind::Binary(_op, left, right) => {
-            recurse(left)?;
-            recurse(right)
+            indent.push_str("├─");
+            show_contained_in(args, left, indent)?;
+            indent.pop();
+            indent.pop();
+            indent.push_str("└─");
+            show_contained_in(args, right, indent)?;
+            indent.pop();
+            indent.pop();
+            Ok(())
         }
         ExpressionKind::UnionAll(vec) => {
-            for expr in vec {
-                recurse(expr)?;
+            for (idx, expr) in vec.iter().enumerate() {
+                let last = idx == vec.len() - 1;
+                if last {
+                    indent.push_str("└─");
+                } else {
+                    indent.push_str("├─");
+                }
+                show_contained_in(args, expr, indent)?;
+                indent.pop();
+                indent.pop();
             }
             Ok(())
         }
-        ExpressionKind::AliasExpanded(_id, expanded) => recurse(expanded),
+        ExpressionKind::AliasExpanded(_id, expanded) => {
+            indent.push_str("└─");
+            show_contained_in(args, expanded, indent)?;
+            indent.pop();
+            indent.pop();
+            Ok(())
+        }
         ExpressionKind::FunctionCall(call) => {
-            for arg in &call.args {
-                recurse(arg)?;
+            for (idx, a) in call.args.iter().enumerate() {
+                let last = idx == call.args.len() - 1;
+                if last {
+                    indent.push_str("└─");
+                } else {
+                    indent.push_str("├─");
+                }
+                show_contained_in(args, a, indent)?;
+                indent.pop();
+                indent.pop();
             }
             Ok(())
         }
