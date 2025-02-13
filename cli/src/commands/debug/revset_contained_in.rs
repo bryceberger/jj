@@ -138,15 +138,22 @@ fn show_contained_in(
             Ok(())
         }
         ExpressionKind::AliasExpanded(_id, expanded) => {
-            indent.push_str("└─");
-            show_contained_in(args, expanded, indent)?;
-            indent.pop();
-            indent.pop();
+            if might_be_revset(&expanded.kind) {
+                indent.push_str("└─");
+                show_contained_in(args, expanded, indent)?;
+                indent.pop();
+                indent.pop();
+            }
             Ok(())
         }
         ExpressionKind::FunctionCall(call) => {
-            for (idx, a) in call.args.iter().enumerate() {
-                let last = idx == call.args.len() - 1;
+            let call_args: Vec<_> = call
+                .args
+                .iter()
+                .filter(|a| might_be_revset(&a.kind))
+                .collect();
+            for (idx, a) in call_args.iter().enumerate() {
+                let last = idx == call_args.len() - 1;
                 if last {
                     indent.push_str("└─");
                 } else {
@@ -170,4 +177,11 @@ fn show_contained_in(
         | ExpressionKind::RangeAll
         | ExpressionKind::Modifier(_) => Ok(()),
     }
+}
+
+fn might_be_revset(kind: &ExpressionKind<'_>) -> bool {
+    !matches!(
+        kind,
+        ExpressionKind::String(_) | ExpressionKind::StringPattern { .. }
+    )
 }
