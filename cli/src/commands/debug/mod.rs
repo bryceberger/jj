@@ -21,6 +21,7 @@ mod local_working_copy;
 mod object;
 mod reindex;
 mod revset;
+mod revset_contained_in;
 mod snapshot;
 mod template;
 mod tree;
@@ -49,6 +50,8 @@ use self::reindex::DebugReindexArgs;
 use self::reindex::cmd_debug_reindex;
 use self::revset::DebugRevsetArgs;
 use self::revset::cmd_debug_revset;
+use self::revset_contained_in::DebugRevsetContainedInArgs;
+use self::revset_contained_in::cmd_debug_revset_contained_in;
 use self::snapshot::DebugSnapshotArgs;
 use self::snapshot::cmd_debug_snapshot;
 use self::template::DebugTemplateArgs;
@@ -78,6 +81,7 @@ pub enum DebugCommand {
     Object(DebugObjectArgs),
     Reindex(DebugReindexArgs),
     Revset(DebugRevsetArgs),
+    RevsetContainedIn(DebugRevsetContainedInArgs),
     Snapshot(DebugSnapshotArgs),
     Template(DebugTemplateArgs),
     Tree(DebugTreeArgs),
@@ -101,6 +105,7 @@ pub fn cmd_debug(
         DebugCommand::Object(args) => cmd_debug_object(ui, command, args),
         DebugCommand::Reindex(args) => cmd_debug_reindex(ui, command, args),
         DebugCommand::Revset(args) => cmd_debug_revset(ui, command, args),
+        DebugCommand::RevsetContainedIn(args) => cmd_debug_revset_contained_in(ui, command, args),
         DebugCommand::Snapshot(args) => cmd_debug_snapshot(ui, command, args),
         DebugCommand::Template(args) => cmd_debug_template(ui, command, args),
         DebugCommand::Tree(args) => cmd_debug_tree(ui, command, args),
