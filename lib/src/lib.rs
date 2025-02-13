@@ -86,7 +86,7 @@ pub mod refs;
 pub mod repo;
 pub mod repo_path;
 pub mod revset;
-mod revset_parser;
+pub mod revset_parser;
 pub mod rewrite;
 #[cfg(feature = "testing")]
 pub mod secret_backend;
