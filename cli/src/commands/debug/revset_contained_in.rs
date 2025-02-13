@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::time::Instant;
 
 use jj_lib::dsl_util;
 use jj_lib::dsl_util::ExpressionNode;
@@ -48,12 +49,16 @@ pub fn cmd_debug_revset_contained_in(
     let node: ExpressionNode<'_, ExpressionKind<'_>> =
         dsl_util::expand_aliases(node, workspace_ctx.aliases_map)?;
 
+    let start = Instant::now();
+    let prev = start;
     show_contained_in(
         &mut ContainedInArgs {
             ui,
             context: &workspace_ctx.to_lowering_context(),
             symbol_resolver: &mut symbol_resolver,
             repo,
+            start,
+            prev,
             align: args.expression.as_ref().len(),
             target: &target,
         },
@@ -69,6 +74,8 @@ struct ContainedInArgs<'a> {
     context: &'a LoweringContext<'a>,
     symbol_resolver: &'a mut dyn SymbolResolver,
     repo: &'a ReadonlyRepo,
+    start: Instant,
+    prev: Instant,
     align: usize,
     target: &'a Rc<ResolvedRevsetExpression>,
 }
@@ -90,11 +97,18 @@ fn show_contained_in(
         .intersection(args.target)
         .evaluate(args.repo)?
         .is_empty();
+
+    let now = Instant::now();
+    let total_elapsed = (now - args.start).as_millis();
+    let new_elapsed = (now - args.prev).as_millis();
+    args.prev = now;
+
     let bold = "\x1b[1m";
     let dim = "\x1b[2m";
     let reset = "\x1b[0m";
     println!(
-        "{color}{contained_in:5}{dim} {indent}{reset}{color}{expression}{reset}",
+        "{total_elapsed:>5}ms (+{new_elapsed:4}ms) {color}{contained_in:5}{dim} \
+         {indent}{reset}{color}{expression}{reset}",
         expression = expression.span.as_str(),
         color = if contained_in { bold } else { dim }
     );
