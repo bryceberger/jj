@@ -46,6 +46,10 @@ pub(crate) struct FileAnnotateArgs {
     #[arg(add = ArgValueCompleter::new(complete::revset_expression_all))]
     revision: Option<RevisionArg>,
 
+    /// An optional domain to restrict the query to.
+    #[arg(long, value_name = "REVSET", add = ArgValueCompleter::new(complete::revset_expression_all))]
+    domain: Option<RevisionArg>,
+
     /// Render each line using the given template
     ///
     /// All 0-argument methods of the [`AnnotationLine` type] are available as
@@ -73,8 +77,22 @@ pub(crate) fn cmd_file_annotate(
 ) -> Result<(), CommandError> {
     let workspace_command = command.workspace_helper(ui)?;
     let repo = workspace_command.repo();
+
+    let domain = match &args.domain {
+        None => RevsetExpression::all(),
+        Some(domain) => workspace_command.parse_revset(ui, domain)?.resolve()?,
+    };
     let starting_commit = workspace_command
         .resolve_single_rev(ui, args.revision.as_ref().unwrap_or(&RevisionArg::AT))?;
+
+    if domain
+        .intersection(&RevsetExpression::commit(starting_commit.id().clone()))
+        .evaluate(workspace_command.repo().as_ref())?
+        .is_empty()
+    {
+        return Err(user_error("Starting commit is not contained within domain"));
+    }
+
     let file_path = workspace_command.parse_file_path(&args.path)?;
     let file_value = starting_commit.tree().path_value(&file_path)?;
     let ui_path = workspace_command.format_file_path(&file_path);
@@ -97,12 +115,8 @@ pub(crate) fn cmd_file_annotate(
     let language = workspace_command.commit_template_language();
     let template = workspace_command.parse_template(ui, &language, &template_text)?;
 
-    // TODO: Should we add an option to limit the domain to e.g. recent commits?
-    // Note that this is probably different from "--skip REVS", which won't
-    // exclude the revisions, but will ignore diffs in those revisions as if
-    // ancestor revisions had new content.
     let mut annotator = FileAnnotator::from_commit(&starting_commit, &file_path)?;
-    annotator.compute(repo.as_ref(), &RevsetExpression::all())?;
+    annotator.compute(repo.as_ref(), &domain)?;
     let annotation = annotator.to_annotation();
 
     render_file_annotation(repo.as_ref(), ui, &template, &annotation)?;
