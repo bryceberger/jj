@@ -17,6 +17,7 @@ use std::rc::Rc;
 
 use clap_complete::ArgValueCandidates;
 use itertools::Itertools;
+use jj_lib::git::is_special_git_remote;
 use jj_lib::repo::Repo;
 use jj_lib::revset::RevsetExpression;
 use jj_lib::str_util::StringPattern;
@@ -72,6 +73,10 @@ pub struct BookmarkListArgs {
     /// by default
     #[arg(long, short, conflicts_with_all = ["all_remotes"])]
     tracked: bool,
+
+    /// Show local bookmarks with no remote equivalent only.
+    #[arg(long, short, conflicts_with_all = ["tracked"])]
+    local_only: bool,
 
     /// Show conflicted bookmarks only
     #[arg(long, short, conflicts_with_all = ["all_remotes"])]
@@ -172,6 +177,15 @@ pub fn cmd_bookmark_list(
     for (name, bookmark_target) in bookmarks_to_list {
         let local_target = bookmark_target.local_target;
         let remote_refs = bookmark_target.remote_refs;
+
+        if args.local_only
+            && remote_refs
+                .iter()
+                .any(|(remote_name, _)| !is_special_git_remote(remote_name))
+        {
+            continue;
+        }
+
         let (mut tracking_remote_refs, untracked_remote_refs) = remote_refs
             .iter()
             .copied()
