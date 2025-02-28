@@ -404,8 +404,13 @@ impl CommandHelper {
     {
         let mut diagnostics = TemplateDiagnostics::new();
         let aliases = load_template_aliases(ui, self.settings().config())?;
-        let template =
-            template_builder::parse(language, &mut diagnostics, template_text, &aliases)?;
+        let template = template_builder::parse(
+            language,
+            &mut diagnostics,
+            template_text,
+            Default::default(),
+            &aliases,
+        )?;
         print_parse_diagnostics(ui, "In template expression", &diagnostics)?;
         Ok(template)
     }
@@ -991,11 +996,28 @@ impl WorkspaceCommandEnvironment {
         L: TemplateLanguage<'a> + ?Sized,
         L::Property: WrapTemplateProperty<'a, C>,
     {
+        self.parse_template_with_locals(ui, language, Default::default(), template_text)
+    }
+
+    /// Parses template of the given language into evaluation tree.
+    pub fn parse_template_with_locals<'a, C, L>(
+        &self,
+        ui: &Ui,
+        language: &L,
+        local_variables: &[(&str, &dyn Fn() -> L::Property)],
+        template_text: &str,
+    ) -> Result<TemplateRenderer<'a, C>, CommandError>
+    where
+        C: Clone + 'a,
+        L: TemplateLanguage<'a> + ?Sized,
+        L::Property: WrapTemplateProperty<'a, C>,
+    {
         let mut diagnostics = TemplateDiagnostics::new();
         let template = template_builder::parse(
             language,
             &mut diagnostics,
             template_text,
+            local_variables.iter().map(|(k, v)| (*k, *v)).collect(),
             &self.template_aliases_map,
         )?;
         print_parse_diagnostics(ui, "In template expression", &diagnostics)?;
@@ -1740,6 +1762,23 @@ to the current parents may contain changes from multiple commits.
         self.env.parse_template(ui, language, template_text)
     }
 
+    /// Parses template of the given language into evaluation tree.
+    pub fn parse_template_with_locals<'a, C, L>(
+        &self,
+        ui: &Ui,
+        language: &L,
+        local_variables: &[(&str, &dyn Fn() -> L::Property)],
+        template_text: &str,
+    ) -> Result<TemplateRenderer<'a, C>, CommandError>
+    where
+        C: Clone + 'a,
+        L: TemplateLanguage<'a> + ?Sized,
+        L::Property: WrapTemplateProperty<'a, C>,
+    {
+        self.env
+            .parse_template_with_locals(ui, language, local_variables, template_text)
+    }
+
     /// Parses template that is validated by `Self::new()`.
     fn reparse_valid_template<'a, C, L>(
         &self,
@@ -1755,6 +1794,7 @@ to the current parents may contain changes from multiple commits.
             language,
             &mut TemplateDiagnostics::new(),
             template_text,
+            Default::default(),
             &self.env.template_aliases_map,
         )
         .expect("parse error should be confined by WorkspaceCommandHelper::new()")
