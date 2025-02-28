@@ -428,6 +428,7 @@ See [`jj help -k bookmarks`] for more information.
 
    [wildcard pattern]: https://jj-vcs.github.io/jj/latest/revsets/#string-patterns
 * `-t`, `--tracked` — Show remote tracked bookmarks only. Omits local Git-tracking bookmarks by default
+* `-l`, `--local-only` — Show local bookmarks with no remote equivalent only
 * `-c`, `--conflicted` — Show conflicted bookmarks only
 * `-r`, `--revisions <REVSETS>` — Show bookmarks whose local targets are in the given revisions
 
