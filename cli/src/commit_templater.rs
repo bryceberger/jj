@@ -3087,6 +3087,7 @@ mod tests {
                 &language,
                 &mut diagnostics,
                 text,
+                Default::default(),
                 &self.template_aliases_map,
             )
         }
