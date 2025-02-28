@@ -43,6 +43,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * Add the `jj touch` command, which modifies a revision's metadata. This can be
   used to generate a new change-id, which may help resolve some divergences.
 
+* `jj evolog` now accepts `--operation-template` to customize operation display.
+  The default can be configured with the `templates.evolog_operation` config
+  option.
+
 ### Fixed bugs
 
 ### Packaging changes
