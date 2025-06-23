@@ -2284,6 +2284,7 @@ pub fn build_expression<'a, L: TemplateLanguage<'a> + ?Sized>(
 pub fn build<'a, C, L>(
     language: &L,
     diagnostics: &mut TemplateDiagnostics,
+    local_variables: HashMap<&str, &dyn Fn() -> L::Property>,
     node: &ExpressionNode,
 ) -> TemplateParseResult<TemplateRenderer<'a, C>>
 where
@@ -2293,7 +2294,7 @@ where
 {
     let self_placeholder = PropertyPlaceholder::new();
     let build_ctx = BuildContext {
-        local_variables: HashMap::new(),
+        local_variables,
         self_variable: &|| self_placeholder.clone().into_dyn_wrapped(),
     };
     let template = expect_template_expression(language, diagnostics, &build_ctx, node)?;
@@ -2305,6 +2306,7 @@ pub fn parse<'a, C, L>(
     language: &L,
     diagnostics: &mut TemplateDiagnostics,
     template_text: &str,
+    local_variables: HashMap<&str, &dyn Fn() -> L::Property>,
     aliases_map: &TemplateAliasesMap,
 ) -> TemplateParseResult<TemplateRenderer<'a, C>>
 where
@@ -2313,7 +2315,8 @@ where
     L::Property: WrapTemplateProperty<'a, C>,
 {
     let node = template_parser::parse(template_text, aliases_map)?;
-    build(language, diagnostics, &node).map_err(|err| err.extend_alias_candidates(aliases_map))
+    build(language, diagnostics, local_variables, &node)
+        .map_err(|err| err.extend_alias_candidates(aliases_map))
 }
 
 pub fn expect_boolean_expression<'a, L: TemplateLanguage<'a> + ?Sized>(
@@ -2536,6 +2539,7 @@ mod tests {
                 &self.language,
                 &mut TemplateDiagnostics::new(),
                 template,
+                Default::default(),
                 &self.aliases_map,
             )
         }
