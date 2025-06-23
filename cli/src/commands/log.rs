@@ -41,6 +41,8 @@ use crate::diff_util::DiffFormatArgs;
 use crate::formatter::FormatterExt as _;
 use crate::graphlog::GraphStyle;
 use crate::graphlog::get_graphlog;
+use crate::templater::PropertyPlaceholder;
+use crate::templater::TemplatePropertyExt as _;
 use crate::templater::TemplateRenderer;
 use crate::ui::Ui;
 
@@ -192,6 +194,7 @@ pub(crate) fn cmd_log(
     let with_content_format = LogContentFormat::new(ui, settings)?;
 
     let template: TemplateRenderer<Commit>;
+    let width_placeholder = PropertyPlaceholder::<i64>::new();
     let node_template: TemplateRenderer<Option<Commit>>;
     {
         let language = workspace_command.commit_template_language();
@@ -200,7 +203,12 @@ pub(crate) fn cmd_log(
             None => settings.get_string("templates.log")?,
         };
         template = workspace_command
-            .parse_template(ui, &language, &template_string)?
+            .parse_template_with_locals(
+                ui,
+                &language,
+                &[("__width", &|| width_placeholder.clone().into_dyn_wrapped())],
+                &template_string,
+            )?
             .labeled(["log", "commit"]);
         node_template = workspace_command
             .parse_template(ui, &language, &settings.get_string("templates.log_node")?)?
@@ -272,6 +280,7 @@ pub(crate) fn cmd_log(
                 let commit = store.get_commit(&key.0)?;
                 let within_graph =
                     with_content_format.sub_width(graph.width(&key, &graphlog_edges));
+                width_placeholder.set(within_graph.width().try_into().unwrap());
                 within_graph.write(ui.new_formatter(&mut buffer).as_mut(), |formatter| {
                     template.format(&commit, formatter)
                 })?;
