@@ -36,11 +36,13 @@ pub fn cmd_debug_revset_contained_in(
     let workspace_command = command.workspace_helper(ui)?;
     let workspace_ctx = workspace_command.env().revset_parse_context();
     let repo = workspace_command.repo().as_ref();
+    let context = workspace_ctx.to_lowering_context();
     let mut symbol_resolver = revset_util::default_symbol_resolver(
         repo,
         command.revset_extensions().symbol_resolvers(),
         workspace_command.id_prefix_context(),
     );
+    let symbol_resolver = &mut symbol_resolver;
 
     let target = workspace_command.resolve_single_rev(ui, &args.target)?;
     let target = RevsetExpression::commit(target.id().clone());
@@ -54,8 +56,8 @@ pub fn cmd_debug_revset_contained_in(
     show_contained_in(
         &mut ContainedInArgs {
             ui,
-            context: &workspace_ctx.to_lowering_context(),
-            symbol_resolver: &mut symbol_resolver,
+            context: &context,
+            symbol_resolver,
             repo,
             start,
             prev,
@@ -69,19 +71,19 @@ pub fn cmd_debug_revset_contained_in(
     Ok(())
 }
 
-struct ContainedInArgs<'a> {
+struct ContainedInArgs<'a, 'b, 'c> {
     ui: &'a Ui,
     context: &'a LoweringContext<'a>,
-    symbol_resolver: &'a mut dyn SymbolResolver,
+    symbol_resolver: &'a mut SymbolResolver<'c>,
     repo: &'a ReadonlyRepo,
     start: Instant,
     prev: Instant,
     align: usize,
-    target: &'a Rc<ResolvedRevsetExpression>,
+    target: &'b Rc<ResolvedRevsetExpression>,
 }
 
 fn show_contained_in(
-    args: &mut ContainedInArgs<'_>,
+    args: &mut ContainedInArgs<'_, '_, '_>,
     expression: &ExpressionNode<'_, ExpressionKind<'_>>,
     indent: &mut String,
 ) -> Result<(), CommandError> {
