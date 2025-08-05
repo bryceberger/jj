@@ -14,6 +14,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### New features
 
+* `jj evolog` now accepts `--operation-template` to customize operation display.
+  The default can be configured with the `templates.evolog_operation` config
+  option.
+
 ### Fixed bugs
 
 ## [0.32.0] - 2025-08-06
