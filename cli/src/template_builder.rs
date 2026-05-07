@@ -1017,6 +1017,7 @@ pub struct BuildContext<'a, 'i> {
     /// This could be `local_variables["self"]`, but keyword lookup shouldn't be
     /// overridden by a user-defined `self` variable.
     self_variable: &'i dyn Fn() -> TemplatePropertyKind<'a>,
+    available_width: PropertyPlaceholder<Option<i64>>,
 }
 
 fn build_keyword<'a, L: TemplateLanguage<'a> + ?Sized>(
@@ -2407,6 +2408,7 @@ fn build_lambda_expression<'a, 'i, T>(
     let inner_build_ctx = BuildContext {
         local_variables,
         self_variable: build_ctx.self_variable,
+        available_width: build_ctx.available_width.clone(),
     };
     build_body(&inner_build_ctx, &lambda.body)
 }
@@ -2518,6 +2520,14 @@ where
             let template =
                 new_truncate_template(content, ellipsis, width, text_util::write_truncated_end);
             Ok(P::wrap_template(template))
+        },
+    );
+    functions.insert(
+        "available_width",
+        |_language, _diagnostics, build_ctx, function| {
+            function.expect_no_arguments()?;
+            let width = build_ctx.available_width.clone();
+            Ok(P::wrap_property(Box::new(width)))
         },
     );
     functions.insert("hash", |language, diagnostics, build_ctx, function| {
@@ -2977,12 +2987,19 @@ where
     L: TemplateLanguage<'a> + ?Sized,
 {
     let self_placeholder = PropertyPlaceholder::new();
+    let available_width_placeholder = PropertyPlaceholder::new();
+    available_width_placeholder.set(None);
     let build_ctx = BuildContext {
         local_variables: HashMap::new(),
         self_variable: &|| self_placeholder.clone().into_dyn_wrapped(),
+        available_width: available_width_placeholder.clone(),
     };
     let template = expect_template_expression(language, diagnostics, &build_ctx, node)?;
-    Ok(TemplateRenderer::new(template, self_placeholder))
+    Ok(TemplateRenderer::new(
+        template,
+        self_placeholder,
+        available_width_placeholder,
+    ))
 }
 
 /// Parses text, expands aliases, then builds template evaluation tree.
