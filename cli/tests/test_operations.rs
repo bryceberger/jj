@@ -477,8 +477,14 @@ fn test_op_log_word_wrap() {
     let test_env = TestEnvironment::default();
     test_env.run_jj_in(".", ["git", "init", "repo"]).success();
     let work_dir = test_env.work_dir("repo");
+
+    // Create a merge operation
     work_dir.write_file("file1", "foo\n".repeat(100));
-    work_dir.run_jj(["debug", "snapshot"]).success();
+    work_dir.run_jj(["util", "snapshot"]).success();
+    work_dir.write_file("file2", "bar\n".repeat(100));
+    work_dir
+        .run_jj(["commit", "-m", "commit 1", "--at-op=@-"])
+        .success();
 
     let render = |args: &[&str], columns: u32, word_wrap: bool| {
         let word_wrap = to_toml_value(word_wrap);
@@ -491,22 +497,59 @@ fn test_op_log_word_wrap() {
 
     // ui.log-word-wrap option works
     insta::assert_snapshot!(render(&["op", "log"], 40, false), @"
-    @  5ea39824268b test-username@host.example.com default@ 2001-02-03 04:05:08.000 +07:00 - 2001-02-03 04:05:08.000 +07:00
+    @  d111f3eed408 test-username@host.example.com default@ 2001-02-03 04:05:10.000 +07:00 - 2001-02-03 04:05:10.000 +07:00
     │  snapshot working copy
-    │  args: jj debug snapshot
+    │  args: jj op log '--config=ui.log-word-wrap=false'
+    ○    f2b38aec5282 test-username@host.example.com default@ 2001-02-03 04:05:10.000 +07:00 - 2001-02-03 04:05:10.000 +07:00
+    ├─╮  reconcile divergent operations
+    │ │  args: jj op log '--config=ui.log-word-wrap=false'
+    ○ │  c58716a19a3d test-username@host.example.com default@ 2001-02-03 04:05:08.000 +07:00 - 2001-02-03 04:05:08.000 +07:00
+    │ │  snapshot working copy
+    │ │  args: jj util snapshot
+    │ ○  eb6b089ded63 test-username@host.example.com default@ 2001-02-03 04:05:09.000 +07:00 - 2001-02-03 04:05:09.000 +07:00
+    ├─╯  commit e8849ae12c709f2321908879bc724fdb2ab8a781
+    │    args: jj commit -m 'commit 1' '--at-op=@-'
     ○  90267f31f904 test-username@host.example.com 2001-02-03 04:05:07.000 +07:00 - 2001-02-03 04:05:07.000 +07:00
     │  add workspace 'default'
     ○  000000000000 root()
     [EOF]
+    ------- stderr -------
+    Concurrent modification detected, resolving automatically.
+    [EOF]
     ");
     insta::assert_snapshot!(render(&["op", "log"], 40, true), @"
-    @  5ea39824268b
+    @  d111f3eed408
     │  test-username@host.example.com
-    │  default@ 2001-02-03 04:05:08.000
-    │  +07:00 - 2001-02-03 04:05:08.000
+    │  default@ 2001-02-03 04:05:10.000
+    │  +07:00 - 2001-02-03 04:05:10.000
     │  +07:00
     │  snapshot working copy
-    │  args: jj debug snapshot
+    │  args: jj op log
+    │  '--config=ui.log-word-wrap=false'
+    ○    f2b38aec5282
+    ├─╮  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:10.000
+    │ │  +07:00 - 2001-02-03 04:05:10.000
+    │ │  +07:00
+    │ │  reconcile divergent operations
+    │ │  args: jj op log
+    │ │  '--config=ui.log-word-wrap=false'
+    ○ │  c58716a19a3d
+    │ │  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:08.000
+    │ │  +07:00 - 2001-02-03 04:05:08.000
+    │ │  +07:00
+    │ │  snapshot working copy
+    │ │  args: jj util snapshot
+    │ ○  eb6b089ded63
+    ├─╯  test-username@host.example.com
+    │    default@ 2001-02-03 04:05:09.000
+    │    +07:00 - 2001-02-03 04:05:09.000
+    │    +07:00
+    │    commit
+    │    e8849ae12c709f2321908879bc724fdb2ab8a781
+    │    args: jj commit -m 'commit 1'
+    │    '--at-op=@-'
     ○  90267f31f904
     │  test-username@host.example.com
     │  2001-02-03 04:05:07.000 +07:00 -
@@ -518,25 +561,76 @@ fn test_op_log_word_wrap() {
 
     // Nested graph should be wrapped
     insta::assert_snapshot!(render(&["op", "log", "--op-diff"], 40, true), @"
-    @  5ea39824268b
+    @  d111f3eed408
     │  test-username@host.example.com
-    │  default@ 2001-02-03 04:05:08.000
-    │  +07:00 - 2001-02-03 04:05:08.000
+    │  default@ 2001-02-03 04:05:10.000
+    │  +07:00 - 2001-02-03 04:05:10.000
     │  +07:00
     │  snapshot working copy
-    │  args: jj debug snapshot
+    │  args: jj op log
+    │  '--config=ui.log-word-wrap=false'
     │
     │  Changed commits:
-    │  ○  + qpvuntsm 79f0968d (no
+    │  ○  + qpvuntsm/0 0d9c7580 (divergent)
+    │     (no description set)
+    │     - qpvuntsm/2 79f0968d (hidden) (no
     │     description set)
-    │     - qpvuntsm/1 e8849ae1 (hidden)
-    │     (empty) (no description set)
     │
     │  Changed working copy default@:
-    │  + qpvuntsm 79f0968d (no description
-    │  set)
-    │  - qpvuntsm/1 e8849ae1 (hidden)
-    │  (empty) (no description set)
+    │  + qpvuntsm/0 0d9c7580 (divergent) (no
+    │  description set)
+    │  - qpvuntsm/2 79f0968d (hidden) (no
+    │  description set)
+    ○    f2b38aec5282
+    ├─╮  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:10.000
+    │ │  +07:00 - 2001-02-03 04:05:10.000
+    │ │  +07:00
+    │ │  reconcile divergent operations
+    │ │  args: jj op log
+    │ │  '--config=ui.log-word-wrap=false'
+    ○ │  c58716a19a3d
+    │ │  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:08.000
+    │ │  +07:00 - 2001-02-03 04:05:08.000
+    │ │  +07:00
+    │ │  snapshot working copy
+    │ │  args: jj util snapshot
+    │ │
+    │ │  Changed commits:
+    │ │  ○  + qpvuntsm 79f0968d (no
+    │ │     description set)
+    │ │     - qpvuntsm/1 e8849ae1 (hidden)
+    │ │     (empty) (no description set)
+    │ │
+    │ │  Changed working copy default@:
+    │ │  + qpvuntsm 79f0968d (no description
+    │ │  set)
+    │ │  - qpvuntsm/1 e8849ae1 (hidden)
+    │ │  (empty) (no description set)
+    │ ○  eb6b089ded63
+    ├─╯  test-username@host.example.com
+    │    default@ 2001-02-03 04:05:09.000
+    │    +07:00 - 2001-02-03 04:05:09.000
+    │    +07:00
+    │    commit
+    │    e8849ae12c709f2321908879bc724fdb2ab8a781
+    │    args: jj commit -m 'commit 1'
+    │    '--at-op=@-'
+    │
+    │    Changed commits:
+    │    ○  + kkmpptxz b09ce45c (empty) (no
+    │    │  description set)
+    │    ○  + qpvuntsm 8d942956 (empty)
+    │       commit 1
+    │       - qpvuntsm/1 e8849ae1 (hidden)
+    │       (empty) (no description set)
+    │
+    │    Changed working copy default@:
+    │    + kkmpptxz b09ce45c (empty) (no
+    │    description set)
+    │    - qpvuntsm/1 e8849ae1 (hidden)
+    │    (empty) (no description set)
     ○  90267f31f904
     │  test-username@host.example.com
     │  2001-02-03 04:05:07.000 +07:00 -
@@ -556,49 +650,123 @@ fn test_op_log_word_wrap() {
     ");
 
     // Nested diff stat shouldn't exceed the terminal width
-    insta::assert_snapshot!(render(&["op", "log", "-n1", "--stat"], 40, true), @"
-    @  5ea39824268b
+    insta::assert_snapshot!(render(&["op", "log",  "--stat"], 40, true), @"
+    @  d111f3eed408
     │  test-username@host.example.com
-    │  default@ 2001-02-03 04:05:08.000
-    │  +07:00 - 2001-02-03 04:05:08.000
+    │  default@ 2001-02-03 04:05:10.000
+    │  +07:00 - 2001-02-03 04:05:10.000
     │  +07:00
     │  snapshot working copy
-    │  args: jj debug snapshot
+    │  args: jj op log
+    │  '--config=ui.log-word-wrap=false'
     │
     │  Changed commits:
-    │  ○  + qpvuntsm 79f0968d (no
+    │  ○  + qpvuntsm/0 0d9c7580 (divergent)
+    │     (no description set)
+    │     - qpvuntsm/2 79f0968d (hidden) (no
     │     description set)
-    │     - qpvuntsm/1 e8849ae1 (hidden)
-    │     (empty) (no description set)
-    │     file1 | 100 ++++++++++++++++++++++
+    │     file2 | 100 ++++++++++++++++++++++
     │     1 file changed, 100 insertions(+), 0 deletions(-)
     │
     │  Changed working copy default@:
-    │  + qpvuntsm 79f0968d (no description
-    │  set)
-    │  - qpvuntsm/1 e8849ae1 (hidden)
-    │  (empty) (no description set)
+    │  + qpvuntsm/0 0d9c7580 (divergent) (no
+    │  description set)
+    │  - qpvuntsm/2 79f0968d (hidden) (no
+    │  description set)
+    ○    f2b38aec5282
+    ├─╮  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:10.000
+    │ │  +07:00 - 2001-02-03 04:05:10.000
+    │ │  +07:00
+    │ │  reconcile divergent operations
+    │ │  args: jj op log
+    │ │  '--config=ui.log-word-wrap=false'
+    ○ │  c58716a19a3d
+    │ │  test-username@host.example.com
+    │ │  default@ 2001-02-03 04:05:08.000
+    │ │  +07:00 - 2001-02-03 04:05:08.000
+    │ │  +07:00
+    │ │  snapshot working copy
+    │ │  args: jj util snapshot
+    │ │
+    │ │  Changed commits:
+    │ │  ○  + qpvuntsm 79f0968d (no
+    │ │     description set)
+    │ │     - qpvuntsm/1 e8849ae1 (hidden)
+    │ │     (empty) (no description set)
+    │ │     file1 | 100 ++++++++++++++++++++
+    │ │     1 file changed, 100 insertions(+), 0 deletions(-)
+    │ │
+    │ │  Changed working copy default@:
+    │ │  + qpvuntsm 79f0968d (no description
+    │ │  set)
+    │ │  - qpvuntsm/1 e8849ae1 (hidden)
+    │ │  (empty) (no description set)
+    │ ○  eb6b089ded63
+    ├─╯  test-username@host.example.com
+    │    default@ 2001-02-03 04:05:09.000
+    │    +07:00 - 2001-02-03 04:05:09.000
+    │    +07:00
+    │    commit
+    │    e8849ae12c709f2321908879bc724fdb2ab8a781
+    │    args: jj commit -m 'commit 1'
+    │    '--at-op=@-'
+    │
+    │    Changed commits:
+    │    ○  + kkmpptxz b09ce45c (empty) (no
+    │    │  description set)
+    │    │  0 files changed, 0 insertions(+), 0 deletions(-)
+    │    ○  + qpvuntsm 8d942956 (empty)
+    │       commit 1
+    │       - qpvuntsm/1 e8849ae1 (hidden)
+    │       (empty) (no description set)
+    │       0 files changed, 0 insertions(+), 0 deletions(-)
+    │
+    │    Changed working copy default@:
+    │    + kkmpptxz b09ce45c (empty) (no
+    │    description set)
+    │    - qpvuntsm/1 e8849ae1 (hidden)
+    │    (empty) (no description set)
+    ○  90267f31f904
+    │  test-username@host.example.com
+    │  2001-02-03 04:05:07.000 +07:00 -
+    │  2001-02-03 04:05:07.000 +07:00
+    │  add workspace 'default'
+    │
+    │  Changed commits:
+    │  ○  + qpvuntsm e8849ae1 (empty) (no
+    │     description set)
+    │     0 files changed, 0 insertions(+), 0 deletions(-)
+    │
+    │  Changed working copy default@:
+    │  + qpvuntsm e8849ae1 (empty) (no
+    │  description set)
+    │  - (absent)
+    ○  000000000000 root()
     [EOF]
     ");
     insta::assert_snapshot!(render(&["op", "log", "-n1", "--no-graph", "--stat"], 40, true), @"
-    5ea39824268b
+    d111f3eed408
     test-username@host.example.com default@
-    2001-02-03 04:05:08.000 +07:00 -
-    2001-02-03 04:05:08.000 +07:00
+    2001-02-03 04:05:10.000 +07:00 -
+    2001-02-03 04:05:10.000 +07:00
     snapshot working copy
-    args: jj debug snapshot
+    args: jj op log
+    '--config=ui.log-word-wrap=false'
 
     Changed commits:
-    + qpvuntsm 79f0968d (no description set)
-    - qpvuntsm/1 e8849ae1 (hidden) (empty)
-    (no description set)
-    file1 | 100 ++++++++++++++++++++++++++++
+    + qpvuntsm/0 0d9c7580 (divergent) (no
+    description set)
+    - qpvuntsm/2 79f0968d (hidden) (no
+    description set)
+    file2 | 100 ++++++++++++++++++++++++++++
     1 file changed, 100 insertions(+), 0 deletions(-)
 
     Changed working copy default@:
-    + qpvuntsm 79f0968d (no description set)
-    - qpvuntsm/1 e8849ae1 (hidden) (empty)
-    (no description set)
+    + qpvuntsm/0 0d9c7580 (divergent) (no
+    description set)
+    - qpvuntsm/2 79f0968d (hidden) (no
+    description set)
     [EOF]
     ");
 
