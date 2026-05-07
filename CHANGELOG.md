@@ -145,6 +145,11 @@ None
   splitting it. Any hunks that are not selected or cannot be absorbed remain in
   the source commit.
 
+* Templates now support `available_width() -> Option<Integer>`. This will
+  provide the number of columns available for the template, subtracting the
+  width of the graph lines. This is only available in graph logs, i.e. `jj log`
+  and `jj op log`.
+
 ### Fixed bugs
 
 * Recursive alias definitions are detected more precisely. jj can now expand
