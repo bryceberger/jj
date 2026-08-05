@@ -4516,7 +4516,7 @@ mod tests {
         insta::assert_snapshot!(env.render_ok(r#""a,b,c,d".split(",", 2)"#), @"a b,c,d");
         insta::assert_snapshot!(env.render_ok(r#""a,b,c,d".split(",", 3)"#), @"a b c,d");
         insta::assert_snapshot!(env.render_ok(r#""a,b,c,d".split(",", 10)"#), @"a b c d");
-        insta::assert_snapshot!(env.render_ok(r#""abc".split(",", -1)"#), @"<Error: out of range integral type conversion attempted>");
+        insta::assert_snapshot!(env.render_ok(r#""abc".split(",", -1)"#), @"<Error: number too small to fit in target type>");
         insta::assert_snapshot!(env.render_ok(r#"json("a1b2c3".split(regex:'\d+'))"#), @r#"["a","b","c",""]"#);
         insta::assert_snapshot!(env.render_ok(r#""foo  bar   baz".split(regex:'\s+')"#), @"foo bar baz");
         insta::assert_snapshot!(env.render_ok(r#""a1b2c3d4".split(regex:'\d+', 3)"#), @"a b c3d4");
@@ -4616,8 +4616,8 @@ mod tests {
         insta::assert_snapshot!(env.render_ok(r#""hello world world world".replace("world", "jj", 2)"#), @"hello jj jj world");
 
         // replace with limit <0 (error due to negative limit)
-        insta::assert_snapshot!(env.render_ok(r#""hello world world".replace("world", "jj", -1)"#), @"<Error: out of range integral type conversion attempted>");
-        insta::assert_snapshot!(env.render_ok(r#""hello world world".replace("world", "jj", -5)"#), @"<Error: out of range integral type conversion attempted>");
+        insta::assert_snapshot!(env.render_ok(r#""hello world world".replace("world", "jj", -1)"#), @"<Error: number too small to fit in target type>");
+        insta::assert_snapshot!(env.render_ok(r#""hello world world".replace("world", "jj", -5)"#), @"<Error: number too small to fit in target type>");
 
         // replace with regex patterns
         insta::assert_snapshot!(env.render_ok(r#""hello123world456".replace(regex:'\d+', "X")"#), @"helloXworldX");
@@ -4979,7 +4979,7 @@ mod tests {
         insta::assert_snapshot!(
             env.render_ok(r#"fill(-10, "The quick fox jumps over the " ++
                                   label("error", "lazy") ++ " dog\n")"#),
-            @"[38;5;1m<Error: out of range integral type conversion attempted>[39m");
+            @"[38;5;1m<Error: number too small to fit in target type>[39m");
 
         // Word-wrap, then indent
         insta::assert_snapshot!(
@@ -5170,7 +5170,7 @@ mod tests {
         // Invalid pad width is not a parse error
         insta::assert_snapshot!(
             env.render_ok("pad_start(-1, 'foo')"),
-            @"<Error: out of range integral type conversion attempted>");
+            @"<Error: number too small to fit in target type>");
     }
 
     #[test]
@@ -5212,7 +5212,7 @@ mod tests {
         // invalid truncate width is not a parse error
         insta::assert_snapshot!(
             env.render_ok("truncate_end(-1, 'foo')"),
-            @"<Error: out of range integral type conversion attempted>");
+            @"<Error: number too small to fit in target type>");
     }
 
     #[test]
@@ -5235,7 +5235,7 @@ mod tests {
         // Property evaluation error
         insta::assert_snapshot!(
             env.render_ok("label(fill(-1, 'foo'), 'text')"),
-            @"[38;5;1m<Error: out of range integral type conversion attempted>[39m");
+            @"[38;5;1m<Error: number too small to fit in target type>[39m");
 
         // Template
         insta::assert_snapshot!(
