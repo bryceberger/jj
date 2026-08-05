@@ -399,8 +399,8 @@ fn test_op_log_template() -> TestResult {
 
     // Negative length shouldn't cause panic.
     insta::assert_snapshot!(render(r#"id.short(-1) ++ "|""#), @"
-    @  <Error: out of range integral type conversion attempted>|
-    ○  <Error: out of range integral type conversion attempted>|
+    @  <Error: number too small to fit in target type>|
+    ○  <Error: number too small to fit in target type>|
     [EOF]
     ");
 
